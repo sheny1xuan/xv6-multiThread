@@ -9,6 +9,8 @@ _entry:
         # stack0 is declared in start.c,
         # with a 4096-byte stack per CPU.
         # sp = stack0 + (hartid * 4096)
+        # 这个是内核程序使用栈
+        # 内核程序的栈底是确定的：cpu0->fp(stack0+4096)，向下增长
         la sp, stack0
         li a0, 1024*4
 	csrr a1, mhartid

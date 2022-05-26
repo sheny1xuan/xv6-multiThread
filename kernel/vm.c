@@ -77,6 +77,8 @@ kvminithart()
 //   21..29 -- 9 bits of level-1 index.
 //   12..20 -- 9 bits of level-0 index.
 //    0..11 -- 12 bits of byte offset within the page.
+// alloc = 1: 允许申请物理页
+// alloc = 0: 不允许申请物理页
 pte_t *
 walk(pagetable_t pagetable, uint64 va, int alloc)
 {
@@ -145,6 +147,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
   
   a = PGROUNDDOWN(va);
   last = PGROUNDDOWN(va + size - 1);
+  // 计算共需要几页物理内存，每次映射一页
   for(;;){
     if((pte = walk(pagetable, a, 1)) == 0)
       return -1;

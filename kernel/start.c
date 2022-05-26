@@ -31,6 +31,8 @@ start()
   w_mepc((uint64)main);
 
   // disable paging for now.
+  // start direct use pa.
+  // satp storage pte pointer.
   w_satp(0);
 
   // delegate all interrupts and exceptions to supervisor mode.
