@@ -129,6 +129,9 @@ static uint64 (*syscalls[])(void) = {
 [SYS_close]   sys_close,
 };
 
+// 普通函数调用与系统调用的区别：
+// 1. 系统调用会陷入内核态
+// 2. 普通函数调用返回通过栈帧(压栈弹栈)返回，而系统调用实现从内核态切换PC指针和用户栈，用户态页表。
 void
 syscall(void)
 {
@@ -136,6 +139,9 @@ syscall(void)
   struct proc *p = myproc();
 
   num = p->trapframe->a7;
+  // 系统调用返回是通过设置 a0寄存器
+  // 如果a0寄存器在原来的用户态有用怎么办：
+  // 应该编译会考虑这个问题，将其放在其他寄存器上进行操作。
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     p->trapframe->a0 = syscalls[num]();
   } else {

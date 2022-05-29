@@ -453,6 +453,10 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+        // 所有的调度发生在这里。
+        // c->context 返回到swtch后的下一条指令。
+        // p->context 返回到被调度线程的swtch后的下一条指令。
+        // 利用ret指令实现pc指针的切换。
         swtch(&c->context, &p->context);
 
         // Process is done running for now.

@@ -55,7 +55,7 @@ kfree(void *pa)
 
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
-
+  // pa地址的8Byte为下一个freelist的地址。
   r = (struct run*)pa;
 
   acquire(&kmem.lock);

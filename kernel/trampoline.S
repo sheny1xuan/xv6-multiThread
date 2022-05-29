@@ -29,9 +29,13 @@ uservec:
         csrrw a0, sscratch, a0
 
         # save the user registers in TRAPFRAME
+        # Return address
         sd ra, 40(a0)
+        # Stack pointer
         sd sp, 48(a0)
+        # Global pointer
         sd gp, 56(a0)
+        # tp Thread pointer
         sd tp, 64(a0)
         sd t0, 72(a0)
         sd t1, 80(a0)
