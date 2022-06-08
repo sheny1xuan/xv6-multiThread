@@ -463,6 +463,7 @@ scheduler(void)
         // It should have changed its p->state before coming back.
         c->proc = 0;
       }
+      // 释放的锁是从yield中拿到的
       release(&p->lock);
     }
   }
@@ -503,6 +504,7 @@ yield(void)
   acquire(&p->lock);
   p->state = RUNNABLE;
   sched();
+  // 释放从scheduler拿到的锁
   release(&p->lock);
 }
 
