@@ -30,6 +30,20 @@ sys_fork(void)
 }
 
 uint64
+sys_clone(void)
+{
+  printf("call thread create\n");
+  return -1;
+//   return fork();
+}
+
+uint64
+sys_join(void)
+{
+  return -1;
+}
+
+uint64
 sys_wait(void)
 {
   uint64 p;
