@@ -16,6 +16,7 @@ int nextpid = 1;
 struct spinlock pid_lock;
 
 extern void forkret(void);
+extern void cloneret(void);
 static void freeproc(struct proc *p);
 
 extern char trampoline[]; // trampoline.S
@@ -139,6 +140,57 @@ found:
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
+  p->context.sp = p->kstack + PGSIZE;
+
+  return p;
+}
+
+// Look in the process table for an UNUSED proc.
+// If found, initialize state required to run in the kernel,
+// and return with p->lock held.
+// If there are no free procs, or a memory allocation fails, return 0.
+static struct proc*
+allocthread(struct proc* pthread)
+{
+  struct proc *p;
+
+  for(p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if(p->state == UNUSED) {
+      goto found;
+    } else {
+      release(&p->lock);
+    }
+  }
+  return 0;
+
+found:
+  p->pid = allocpid();
+  p->state = USED;
+
+  // Allocate a trapframe page, and map it to process
+  if((p->trapframe = (struct trapframe *)kalloc()) == 0){
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
+  // same pagetable
+  p->pagetable = pthread->pagetable;
+
+  // map thild trapframe.
+  // TODO: data race
+  // TODO: setup TRAPFRAME sccording thread id
+  if(mappages(p->pagetable, TRAPFRAME1, PGSIZE,
+              (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
+    uvmfree(p->pagetable, 0);
+    return 0;
+  }
+
+  // Set up new context to start executing at forkret,
+  // which returns to user space.
+  memset(&p->context, 0, sizeof(p->context));
+  p->context.ra = (uint64)cloneret;
   p->context.sp = p->kstack + PGSIZE;
 
   return p;
@@ -316,6 +368,56 @@ fork(void)
   release(&np->lock);
 
   return pid;
+}
+
+int clone(void (*func)(void*), void* arg, void* stk) {
+  int i, pid;
+  struct proc *np;
+  struct proc *p = myproc();
+
+  // Allocate child thread.
+  if((np = allocthread(p)) == 0){
+    return -1;
+  }
+
+  np->sz = p->sz;
+
+  // copy saved user registers.
+  *(np->trapframe) = *(p->trapframe);
+
+  // copy usr stack
+  uint64 pustk_paddr = PGROUNDDOWN(walkaddr(p->pagetable, p->trapframe->sp));
+  uint64 pstk_paddr = PGROUNDDOWN(walkaddr(p->pagetable, (uint64) stk));
+
+  // Cause clone to return 0 in the child.
+  np->trapframe->a0 = 0;
+
+  // increment reference counts on open file descriptors.
+  for(i = 0; i < NOFILE; i++)
+    if(p->ofile[i])
+      np->ofile[i] = filedup(p->ofile[i]);
+  np->cwd = idup(p->cwd);
+
+  safestrcpy(np->name, p->name, sizeof(p->name));
+
+  pid = np->pid;
+
+  release(&np->lock);
+
+  acquire(&wait_lock);
+  np->parent = p;
+  release(&wait_lock);
+
+  acquire(&np->lock);
+  np->state = RUNNABLE;
+  release(&np->lock);
+
+  return pid;
+}
+
+int join(void* addr) {
+
+    return -1;
 }
 
 // Pass p's abandoned children to init.
@@ -512,6 +614,27 @@ yield(void)
 // will swtch to forkret.
 void
 forkret(void)
+{
+  static int first = 1;
+
+  // Still holding p->lock from scheduler.
+  release(&myproc()->lock);
+
+  if (first) {
+    // File system initialization must be run in the context of a
+    // regular process (e.g., because it calls sleep), and thus cannot
+    // be run from main().
+    first = 0;
+    fsinit(ROOTDEV);
+  }
+
+  usertrapret();
+}
+
+// A clone child's very first scheduling by scheduler()
+// will swtch to cloneret.
+void
+cloneret(void)
 {
   static int first = 1;
 

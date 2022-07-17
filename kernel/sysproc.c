@@ -33,14 +33,22 @@ uint64
 sys_clone(void)
 {
   printf("call thread create\n");
-  return -1;
+    uint64 func;
+    uint64 arg;
+    uint64 stk;
+    argaddr(0, &func);
+    argaddr(1, &arg);
+    argaddr(2, &stk);
+    return clone((void(*)(void*))func, (void*)arg, (void*)stk);
 //   return fork();
 }
 
 uint64
 sys_join(void)
 {
-  return -1;
+    uint64 stk;
+    argaddr(0, &stk);
+  return join((void*)stk);
 }
 
 uint64

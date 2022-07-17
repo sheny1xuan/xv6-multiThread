@@ -6,6 +6,7 @@
         "types.h": "c",
         "atomic": "c",
         "fstream": "c",
-        "sstream": "c"
+        "sstream": "c",
+        "defs.h": "c"
     }
 }
