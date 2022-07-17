@@ -2,10 +2,10 @@
 #include "user/user.h"
 
 void func(void* arg) {
-    uint64 addr = *(uint64*)arg;
-    uint64 x = 100;
-    addr += x;
-    printf("this func is called in thread : arg : %ld\n", addr);
+    int x = *(int*)arg;
+    printf("this func is called in thread, arg : %d\n", x);
+
+    exit(0);
 }
 
 int
@@ -17,7 +17,11 @@ main(int argc, char *argv[]) {
         printf("create thread error\n");
         exit(0);
     }
-    thread_join(pid);
+    // thread_join(pid);
+
+    printf("clone ret\n");
+
+    sleep(10);
 
     exit(0);
 }

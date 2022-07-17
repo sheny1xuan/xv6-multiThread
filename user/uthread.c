@@ -45,9 +45,9 @@ int thread_create(void (*start_routine)(void*), void* args) {
         }
     }
 
-    void *stk = malloc(PAGESIZE);
-    int pid = clone(start_routine, args, stk);
-    add_thread(&pid, stk);
+    // void *stk = malloc(PAGESIZE);
+    int pid = clone(start_routine, args, 0);
+    add_thread(&pid, 0);
     return pid;
 }
 

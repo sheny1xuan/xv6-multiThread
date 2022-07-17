@@ -66,4 +66,4 @@
 //   TRAMPOLINE (the same page as in the kernel)
 #define TRAPFRAME (TRAMPOLINE - PGSIZE)
 
-#define TRAPFRAME1 (TRAPFRAME - PGSIZE)
+#define GETTRAPFRAME(tid) (TRAPFRAME - tid*PGSIZE)

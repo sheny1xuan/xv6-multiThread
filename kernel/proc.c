@@ -53,6 +53,7 @@ procinit(void)
   initlock(&wait_lock, "wait_lock");
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
+      p->pid = 0;
       p->kstack = KSTACK((int) (p - proc));
   }
 }
@@ -178,10 +179,11 @@ found:
   // same pagetable
   p->pagetable = pthread->pagetable;
 
+  p->tid = 1;
   // map thild trapframe.
   // TODO: data race
   // TODO: setup TRAPFRAME sccording thread id
-  if(mappages(p->pagetable, TRAPFRAME1, PGSIZE,
+  if(mappages(p->pagetable, GETTRAPFRAME(p->tid), PGSIZE,
               (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
     uvmfree(p->pagetable, 0);
     return 0;
@@ -205,8 +207,14 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
-  if(p->pagetable)
-    proc_freepagetable(p->pagetable, p->sz);
+  if(p->pagetable) {
+    if (p->tid == 0) {
+      proc_freepagetable(p->pagetable, p->sz);
+    } else {
+      uvmunmap(p->pagetable, GETTRAPFRAME(p->tid), 1, 0);
+    }
+  }
+    
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -215,6 +223,7 @@ freeproc(struct proc *p)
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
+  p->tid = 0;
   p->state = UNUSED;
 }
 
@@ -257,7 +266,7 @@ void
 proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
-  uvmunmap(pagetable, TRAPFRAME, 1, 0);
+  uvmunmap(pagetable, GETTRAPFRAME(0), 1, 0);
   uvmfree(pagetable, sz);
 }
 
@@ -386,11 +395,15 @@ int clone(void (*func)(void*), void* arg, void* stk) {
   *(np->trapframe) = *(p->trapframe);
 
   // copy usr stack
-  uint64 pustk_paddr = PGROUNDDOWN(walkaddr(p->pagetable, p->trapframe->sp));
-  uint64 pstk_paddr = PGROUNDDOWN(walkaddr(p->pagetable, (uint64) stk));
+//   uint64 pstk_paddr = walkaddr(p->pagetable, PGROUNDDOWN(p->trapframe->sp));
+//   uint64 npstk_paddr = walkaddr(p->pagetable, PGROUNDDOWN(p->trapframe->sp) + PGSIZE * 2);
 
+  //   memmove((void*)npstk_paddr, (const void*)pstk_paddr, PGSIZE);
   // Cause clone to return 0 in the child.
-  np->trapframe->a0 = 0;
+  np->trapframe->sp = PGROUNDUP(p->trapframe->sp) + PGSIZE * 2;
+  np->trapframe->s0 = PGROUNDUP(p->trapframe->sp) + PGSIZE * 2;
+  np->trapframe->a0 = (uint64)arg;
+  np->trapframe->ra = (uint64)func;
 
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)
@@ -447,18 +460,19 @@ exit(int status)
     panic("init exiting");
 
   // Close all open files.
-  for(int fd = 0; fd < NOFILE; fd++){
-    if(p->ofile[fd]){
-      struct file *f = p->ofile[fd];
-      fileclose(f);
-      p->ofile[fd] = 0;
+  if (p->tid == 0) {
+    for(int fd = 0; fd < NOFILE; fd++){
+        if(p->ofile[fd]){
+        struct file *f = p->ofile[fd];
+        fileclose(f);
+        p->ofile[fd] = 0;
+        }
     }
+    begin_op();
+    iput(p->cwd);
+    end_op();
+    p->cwd = 0;
   }
-
-  begin_op();
-  iput(p->cwd);
-  end_op();
-  p->cwd = 0;
 
   acquire(&wait_lock);
 
@@ -636,18 +650,21 @@ forkret(void)
 void
 cloneret(void)
 {
-  static int first = 1;
+//   static int first = 1;
+
+  struct proc* p = myproc();
 
   // Still holding p->lock from scheduler.
-  release(&myproc()->lock);
+  release(&p->lock);
+  p->trapframe->epc = p->trapframe->ra;
 
-  if (first) {
-    // File system initialization must be run in the context of a
-    // regular process (e.g., because it calls sleep), and thus cannot
-    // be run from main().
-    first = 0;
-    fsinit(ROOTDEV);
-  }
+//   if (first) {
+//     // File system initialization must be run in the context of a
+//     // regular process (e.g., because it calls sleep), and thus cannot
+//     // be run from main().
+//     first = 0;
+//     fsinit(ROOTDEV);
+//   }
 
   usertrapret();
 }
