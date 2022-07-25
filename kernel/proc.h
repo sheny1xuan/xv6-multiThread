@@ -95,16 +95,26 @@ struct proc {
 
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process
-
+  
+  // tid indicate the id of this thread id in process
+  // tid = 0 : is main thread
+  // tid != 0: is a child thread of process.
+  // 
+  // thread_cnt is total thread count of process.
   uint64 tid;
+  uint64 t_cnt;
 
   // these are private to the process, so p->lock need not be held.
   uint64 kstack;               // Virtual address of kernel stack
   uint64 sz;                   // Size of process memory (bytes)
+
+  // Share in thread, lock them
   pagetable_t pagetable;       // User page table
+  struct file *ofile[NOFILE];  // Open files
+  
+  // thread own
   struct trapframe *trapframe; // data page for trampoline.S
   struct context context;      // swtch() here to run process
-  struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 };

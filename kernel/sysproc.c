@@ -32,7 +32,6 @@ sys_fork(void)
 uint64
 sys_clone(void)
 {
-  printf("call thread create\n");
     uint64 func;
     uint64 arg;
     uint64 stk;

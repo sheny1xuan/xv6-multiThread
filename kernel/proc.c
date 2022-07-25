@@ -54,6 +54,8 @@ procinit(void)
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
       p->pid = 0;
+      p->tid = 0;
+      p->t_cnt = 0;
       p->kstack = KSTACK((int) (p - proc));
   }
 }
@@ -120,6 +122,9 @@ allocproc(void)
 
 found:
   p->pid = allocpid();
+  p->tid = 0;
+  p->t_cnt = 1;
+
   p->state = USED;
 
   // Allocate a trapframe page.
@@ -179,15 +184,29 @@ found:
   // same pagetable
   p->pagetable = pthread->pagetable;
 
-  p->tid = 1;
+  p->tid = pthread->t_cnt;
+
+  printf("Create thread tid: %d for %d \n", p->tid, pthread->pid);
+  // IsSafe here ?
+  pthread->t_cnt += 1;
+
   // map thild trapframe.
   // TODO: data race
-  // TODO: setup TRAPFRAME sccording thread id
   if(mappages(p->pagetable, GETTRAPFRAME(p->tid), PGSIZE,
               (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
     uvmfree(p->pagetable, 0);
     return 0;
   }
+
+  // map thild stack.
+  if(mappages(p->pagetable, GETTSTACK(p->tid), PGSIZE,
+              (uint64)(p->trapframe), PTE_W|PTE_X|PTE_R|PTE_U) < 0){
+    uvmfree(p->pagetable, 0);
+    return 0;
+  }
+
+  // add guard for stack
+  uvmclear(p->pagetable, GETTGUARD(p->tid));
 
   // Set up new context to start executing at forkret,
   // which returns to user space.
@@ -212,6 +231,7 @@ freeproc(struct proc *p)
       proc_freepagetable(p->pagetable, p->sz);
     } else {
       uvmunmap(p->pagetable, GETTRAPFRAME(p->tid), 1, 0);
+      uvmunmap(p->pagetable, GETTSTACK(p->tid), 1, 0);
     }
   }
     
@@ -224,6 +244,7 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->tid = 0;
+  p->t_cnt = 0;
   p->state = UNUSED;
 }
 
@@ -394,14 +415,11 @@ int clone(void (*func)(void*), void* arg, void* stk) {
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
 
-  // copy usr stack
-//   uint64 pstk_paddr = walkaddr(p->pagetable, PGROUNDDOWN(p->trapframe->sp));
-//   uint64 npstk_paddr = walkaddr(p->pagetable, PGROUNDDOWN(p->trapframe->sp) + PGSIZE * 2);
-
-  //   memmove((void*)npstk_paddr, (const void*)pstk_paddr, PGSIZE);
+  // memmove((void*)npstk_paddr, (const void*)pstk_paddr, PGSIZE);
   // Cause clone to return 0 in the child.
-  np->trapframe->sp = PGROUNDUP(p->trapframe->sp) + PGSIZE * 2;
-  np->trapframe->s0 = PGROUNDUP(p->trapframe->sp) + PGSIZE * 2;
+  // HEAP TOP
+  np->trapframe->sp = GETTSTACK(np->tid) + PGSIZE;
+  np->trapframe->s0 = GETTSTACK(np->tid) + PGSIZE;
   np->trapframe->a0 = (uint64)arg;
   np->trapframe->ra = (uint64)func;
 
@@ -657,14 +675,6 @@ cloneret(void)
   // Still holding p->lock from scheduler.
   release(&p->lock);
   p->trapframe->epc = p->trapframe->ra;
-
-//   if (first) {
-//     // File system initialization must be run in the context of a
-//     // regular process (e.g., because it calls sleep), and thus cannot
-//     // be run from main().
-//     first = 0;
-//     fsinit(ROOTDEV);
-//   }
 
   usertrapret();
 }

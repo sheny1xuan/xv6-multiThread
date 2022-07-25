@@ -69,11 +69,9 @@ exec(char *path, char **argv)
   sz = PGROUNDUP(sz);
   uint64 sz1;
 
-  // other two page is for thread
-  if((sz1 = uvmalloc(pagetable, sz, sz + 4*PGSIZE)) == 0)
+  if((sz1 = uvmalloc(pagetable, sz, sz + 2*PGSIZE)) == 0)
     goto bad;
   sz = sz1;
-  uvmclear(pagetable, sz-4*PGSIZE);
   uvmclear(pagetable, sz-2*PGSIZE);
 
   sp = sz - 2*PGSIZE;

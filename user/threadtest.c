@@ -3,24 +3,30 @@
 
 void func(void* arg) {
     int x = *(int*)arg;
-    printf("this func is called in thread, arg : %d\n", x);
+    printf("this func is called in thread, thread : %d\n", x);
 
     exit(0);
 }
 
+int tid[4] = {1, 2, 3, 4}; 
+
+void testCreateThread() {
+    for (int i = 0; i < 4; i++) {
+        int pid = thread_create(func, &tid[i]);
+
+        if (pid == -1) {
+            printf("create thread error\n");
+            exit(0);
+        }
+        // thread_join(pid);
+    }
+
+    printf("Test create thread pass!\n");
+}
+
 int
 main(int argc, char *argv[]) {
-    int cnt = argc;
-    int pid = thread_create(func, &cnt);
-
-    if (pid == -1) {
-        printf("create thread error\n");
-        exit(0);
-    }
-    // thread_join(pid);
-
-    printf("clone ret\n");
-
+    testCreateThread();
     sleep(10);
 
     exit(0);

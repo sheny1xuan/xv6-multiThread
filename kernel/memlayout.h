@@ -62,8 +62,13 @@
 //   fixed-size stack
 //   expandable heap
 //   ...
+//   thread1 TRAPFRAME
+//   GUARD PAGE
+//   thread1 STACK
 //   TRAPFRAME (p->trapframe, used by the trampoline)
 //   TRAMPOLINE (the same page as in the kernel)
 #define TRAPFRAME (TRAMPOLINE - PGSIZE)
 
-#define GETTRAPFRAME(tid) (TRAPFRAME - tid*PGSIZE)
+#define GETTRAPFRAME(tid) (TRAPFRAME - tid*3*PGSIZE)
+#define GETTGUARD(tid) (GETTRAPFRAME(tid) + PGSIZE)
+#define GETTSTACK(tid) (GETTRAPFRAME(tid) + 2*PGSIZE)

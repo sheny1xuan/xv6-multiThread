@@ -1,7 +1,7 @@
 #include "kernel/types.h"
 #include "user/user.h"
 
-#define NTHREAD 4
+#define NTHREAD 3
 #define PAGESIZE 4096
 
 struct 
