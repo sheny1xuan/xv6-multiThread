@@ -106,6 +106,7 @@ struct proc {
   uint64 kstack;               // Virtual address of kernel stack
   
   // protect by corroding lock
+  struct spinlock resource_lock;
   pagetable_t pagetable;       // User page table
   struct file *ofile[NOFILE];  // Open files
   uint64 sz;                   // Size of process memory (bytes)

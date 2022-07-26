@@ -10,10 +10,6 @@ struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
 
-struct spinlock page_lock[NPROC];
-struct spinlock file_lock[NPROC];
-struct spinlock sz_lock[NPROC];
-
 struct proc *initproc;
 
 int nextpid = 1;
@@ -58,16 +54,11 @@ procinit(void)
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
       initlock(&p->tlock, "thread_lock");
+      initlock(&p->resource_lock, "thread_lock");
       p->pid = 0;
       p->tid = 0;
       p->t_cnt = 1;
       p->kstack = KSTACK((int) (p - proc));
-  }
-
-  for (int i = 0; i < NPROC; i++) {
-    initlock(&page_lock[i], "pagelock");
-    initlock(&file_lock[i], "filelock");
-    initlock(&sz_lock[i], "szlock");
   }
 }
 
@@ -196,7 +187,7 @@ found:
   pthread->t_cnt += 1;
   release(&pthread->tlock);
 
-  acquire(&page_lock[pthread->pid]);
+  acquire(&pthread->resource_lock);
   // Allocate a trapframe page, and map it to process
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
@@ -232,15 +223,11 @@ found:
 #ifdef DEBUGTHREAD
   vmprint(p->pagetable, 2);
 #endif
-
-  release(&page_lock[pthread->pid]);
-
-  acquire(&file_lock[pthread->pid]);
   // increment reference counts on open file descriptors.
   for(int i = 0; i < NOFILE; i++)
     if(pthread->ofile[i])
       p->ofile[i] = pthread->ofile[i];
-  release(&file_lock[pthread->pid]);
+  release(&pthread->resource_lock);
 
   // Set up new context to start executing at forkret,
   // which returns to user space.
@@ -262,23 +249,17 @@ freeproc(struct proc *p)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
 
-//   int page_lock_id;
-
-//   if (p->tid == 0) {
-//     page_lock_id = p->pid;
-//   } else {
-//     page_lock_id = p->parent->pid;
-//   }
-
   if(p->pagetable) {
-    // acquire(&page_lock[page_lock_id]);
     if (p->tid == 0) {
+      acquire(&p->resource_lock);
       proc_freepagetable(p->pagetable, p->sz);
+      release(&p->resource_lock);
     } else {
+      acquire(&p->parent->resource_lock);
       uvmunmap(p->pagetable, GETTRAPFRAME(p->tid), 1, 0);
       uvmunmap(p->pagetable, GETTSTACK(p->tid), 1, 0);
+      release(&p->parent->resource_lock);
     }
-    // release(&page_lock[page_lock_id]);
   }
     
   p->pagetable = 0;
@@ -447,7 +428,6 @@ fork(void)
 }
 
 int clone(void (*func)(void*), void* arg, void* stk) {
-  int pid;
   struct proc *np;
   struct proc *p = myproc();
 
@@ -473,8 +453,6 @@ int clone(void (*func)(void*), void* arg, void* stk) {
 
   safestrcpy(np->name, p->name, sizeof(p->name));
 
-  pid = np->pid;
-
   release(&np->lock);
 
   acquire(&wait_lock);
@@ -485,7 +463,7 @@ int clone(void (*func)(void*), void* arg, void* stk) {
   np->state = RUNNABLE;
   release(&np->lock);
 
-  return pid;
+  return np->tid;
 }
 
 int join(int tid) {
@@ -507,12 +485,6 @@ int join(int tid) {
         if(np->state == ZOMBIE && np->tid == tid){
           // Found one.
           pid = np->pid;
-        //   if(addr != 0 && copyout(p->pagetable, addr, (char *)&np->xstate,
-        //                           sizeof(np->xstate)) < 0) {
-        //     release(&np->lock);
-        //     release(&wait_lock);
-        //     return -1;
-        //   }
           freeproc(np);
           release(&np->lock);
           release(&wait_lock);

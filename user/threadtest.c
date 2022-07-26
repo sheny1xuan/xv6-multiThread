@@ -22,7 +22,7 @@ void testCreateThread() {
     }
 
     for (int i = 0; i < 4; i++) {
-        int pid = thread_join(i);
+        int pid = thread_join(i + 1);
         printf("join thread %d, it's pid is %d\n", i, pid);
     }
 

@@ -47,6 +47,7 @@ sys_join(void)
 {
   int tid;
   argint(0, &tid);
+  printf("join tid(%d) for %d\n", tid, myproc()->pid);
   return join(tid);
 }
 
