@@ -131,6 +131,10 @@ static uint64 (*syscalls[])(void) = {
 [SYS_close]   sys_close,
 [SYS_clone]   sys_clone,
 [SYS_join]    sys_join,
+[SYS_sem_create]    sys_join,
+[SYS_sem_free]    sys_join,
+[SYS_sem_p]    sys_join,
+[SYS_sem_v]    sys_join,
 };
 
 // 普通函数调用与系统调用的区别：

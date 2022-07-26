@@ -38,3 +38,7 @@ entry("sleep");
 entry("uptime");
 entry("clone");
 entry("join");
+entry("sem_create");
+entry("sem_free");
+entry("sem_p");
+entry("sem_v");

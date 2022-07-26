@@ -60,7 +60,7 @@ procinit(void)
       initlock(&p->tlock, "thread_lock");
       p->pid = 0;
       p->tid = 0;
-      p->t_cnt = 0;
+      p->t_cnt = 1;
       p->kstack = KSTACK((int) (p - proc));
   }
 
@@ -262,23 +262,23 @@ freeproc(struct proc *p)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
 
-  int page_lock_id;
+//   int page_lock_id;
 
-  if (p->tid == 0) {
-    page_lock_id = p->pid;
-  } else {
-    page_lock_id = p->parent->pid;
-  }
+//   if (p->tid == 0) {
+//     page_lock_id = p->pid;
+//   } else {
+//     page_lock_id = p->parent->pid;
+//   }
 
   if(p->pagetable) {
-    acquire(&page_lock[page_lock_id]);
+    // acquire(&page_lock[page_lock_id]);
     if (p->tid == 0) {
       proc_freepagetable(p->pagetable, p->sz);
     } else {
       uvmunmap(p->pagetable, GETTRAPFRAME(p->tid), 1, 0);
       uvmunmap(p->pagetable, GETTSTACK(p->tid), 1, 0);
     }
-    release(&page_lock[page_lock_id]);
+    // release(&page_lock[page_lock_id]);
   }
     
   p->pagetable = 0;
@@ -290,7 +290,7 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->tid = 0;
-  p->t_cnt = 0;
+  p->t_cnt = 1;
   p->state = UNUSED;
 }
 
@@ -543,6 +543,15 @@ reparent(struct proc *p)
 
   for(pp = proc; pp < &proc[NPROC]; pp++){
     if(pp->parent == p){
+      // if main thread exit, other thread will be killed.
+      if (pp->tid != 0) {
+        acquire(&pp->lock);
+        pp->killed = 1;
+        release(&pp->lock);
+
+        continue;
+      }
+      
       pp->parent = initproc;
       wakeup(initproc);
     }
