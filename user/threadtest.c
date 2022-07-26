@@ -29,10 +29,74 @@ void testCreateThread() {
     printf("Test create thread pass!\n");
 }
 
+struct {
+    int consumer;
+    int producer;
+} sem_ids;
+
+void consumeFunc(void* args) {
+    for (int i = 0; i < 10; i++) {
+        sem_p(sem_ids.consumer);
+        printf("consume thread...\n");
+        sem_v(sem_ids.producer);
+    }
+
+    exit(0);
+}
+
+void testThreadSync() {
+    sem_ids.consumer = sem_create(0);
+    sem_ids.producer = sem_create(1);
+    thread_create(consumeFunc, 0);
+
+    for (int i = 0; i < 10; i++) {
+        sem_p(sem_ids.producer);
+        printf("produce thread...\n");
+        sem_v(sem_ids.consumer);
+    }
+
+    thread_join(1);
+
+    printf("Pass thread sync\n");
+}
+
+void testThreadMallocFree() {
+    sem_ids.consumer = sem_create(0);
+    sem_ids.producer = sem_create(1);
+    thread_create(consumeFunc, 0);
+
+    for (int i = 0; i < 10; i++) {
+        sem_p(sem_ids.producer);
+        printf("produce thread...\n");
+        sem_v(sem_ids.consumer);
+    }
+
+    thread_join(1);
+
+    printf("Pass thread sync\n");
+}
+
+// void testThreadMallocFree() {
+//     sem_ids.consumer = sem_create(0);
+//     sem_ids.producer = sem_create(1);
+//     thread_create(consumeFunc, 0);
+
+//     for (int i = 0; i < 10; i++) {
+//         sem_p(sem_ids.producer);
+//         printf("produce thread...\n");
+//         sem_v(sem_ids.consumer);
+//     }
+
+//     thread_join(1);
+
+//     printf("Pass thread sync\n");
+// }
+
 int
 main(int argc, char *argv[]) {
     testCreateThread();
-    sleep(10);
+
+    testThreadSync();
 
     exit(0);
 }

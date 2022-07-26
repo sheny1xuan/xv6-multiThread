@@ -108,3 +108,15 @@ pop_off(void)
   if(c->noff == 0 && c->intena)
     intr_on();
 }
+
+int sem_use_count = 0;
+struct sem sems[SEM_MAX_NUM];
+
+void seminit() {
+    for (int i  = 0; i < SEM_MAX_NUM; i++) {
+        initlock(&(sems[i].lock), "semaphore");
+        sems[i].allocated = 0;
+    }
+
+    return;
+}

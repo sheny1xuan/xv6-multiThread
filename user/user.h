@@ -25,6 +25,10 @@ int sleep(int);
 int uptime(void);
 int clone(void (*task)(void* arg), void*, void*);
 int join(int);
+int sem_create(int);
+int sem_free(int);
+void sem_p(int);
+void sem_v(int);
 
 // ulib.c
 int stat(const char*, struct stat*);

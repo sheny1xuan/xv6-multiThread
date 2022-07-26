@@ -8,6 +8,20 @@
         "fstream": "c",
         "sstream": "c",
         "defs.h": "c",
-        "memory_resource": "c"
+        "memory_resource": "c",
+        "stat.h": "c",
+        "deque": "c",
+        "string": "c",
+        "unordered_map": "c",
+        "vector": "c",
+        "optional": "c",
+        "ios": "c",
+        "istream": "c",
+        "limits": "c",
+        "ostream": "c",
+        "streambuf": "c",
+        "type_traits": "c",
+        "tuple": "c",
+        "proc.h": "c"
     }
 }

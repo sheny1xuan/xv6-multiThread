@@ -106,6 +106,10 @@ extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
 extern uint64 sys_clone(void);
 extern uint64 sys_join(void);
+extern uint64 sys_sem_create(void);
+extern uint64 sys_sem_free(void);
+extern uint64 sys_sem_p(void);
+extern uint64 sys_sem_v(void);
 
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -131,10 +135,10 @@ static uint64 (*syscalls[])(void) = {
 [SYS_close]   sys_close,
 [SYS_clone]   sys_clone,
 [SYS_join]    sys_join,
-[SYS_sem_create]    sys_join,
-[SYS_sem_free]    sys_join,
-[SYS_sem_p]    sys_join,
-[SYS_sem_v]    sys_join,
+[SYS_sem_create]    sys_sem_create,
+[SYS_sem_free]    sys_sem_free,
+[SYS_sem_p]    sys_sem_p,
+[SYS_sem_v]    sys_sem_v,
 };
 
 // 普通函数调用与系统调用的区别：

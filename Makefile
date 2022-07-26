@@ -134,6 +134,7 @@ UPROGS=\
 	$U/_zombie\
 	$U/_uthread\
 	$U/_threadtest\
+	$U/_semtest
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)

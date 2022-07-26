@@ -82,6 +82,8 @@ struct trapframe {
 
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+#define MAXTHREADS 4
+
 // Per-process state
 struct proc {
   struct spinlock lock;
@@ -114,7 +116,7 @@ struct proc {
   // Share in thread, lock them
   struct spinlock tlock;
   uint64 tid;
-  uint64 t_cnt;
+  uint64 t_flag;
   
   // thread own
   struct trapframe *trapframe; // data page for trampoline.S

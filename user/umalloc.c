@@ -27,6 +27,12 @@ free(void *ap)
   Header *bp, *p;
 
   bp = (Header*)ap - 1;
+//   https://gnuchops.wordpress.com/2013/02/26/memory-allocator-for-embedded-system-k-r-ritchie-book/
+// 4种情况
+// 1.  free->used->ap->free
+// 2.  free->ap->used->free
+// 3.  free->used->ap->used->free
+// 4.  out of freelist : freelist, ap
   for(p = freep; !(bp > p && bp < p->s.ptr); p = p->s.ptr)
     if(p >= p->s.ptr && (bp > p || bp < p->s.ptr))
       break;
@@ -40,6 +46,7 @@ free(void *ap)
     p->s.ptr = bp->s.ptr;
   } else
     p->s.ptr = bp;
+  
   freep = p;
 }
 
@@ -51,6 +58,7 @@ morecore(uint nu)
 
   if(nu < 4096)
     nu = 4096;
+  // nu -> nuint 即为Header的大小
   p = sbrk(nu * sizeof(Header));
   if(p == (char*)-1)
     return 0;
@@ -65,7 +73,8 @@ malloc(uint nbytes)
 {
   Header *p, *prevp;
   uint nunits;
-
+  
+  // nunits的单位是Header的大小(16Bytes)
   nunits = (nbytes + sizeof(Header) - 1)/sizeof(Header) + 1;
   if((prevp = freep) == 0){
     base.s.ptr = freep = prevp = &base;

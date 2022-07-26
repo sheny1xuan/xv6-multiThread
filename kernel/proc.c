@@ -57,7 +57,7 @@ procinit(void)
       initlock(&p->resource_lock, "thread_lock");
       p->pid = 0;
       p->tid = 0;
-      p->t_cnt = 1;
+      p->t_flag = 1;
       p->kstack = KSTACK((int) (p - proc));
   }
 }
@@ -103,6 +103,23 @@ allocpid() {
   return pid;
 }
 
+int
+alloctid(uint64* t_flag) {
+  int i;
+  for (i = 1; i <= MAXTHREADS; i++) {
+    if ((((*t_flag) >> i) & 1) == 0) {
+        (*t_flag) |= (1 << i);
+        break;
+    }
+  }
+
+  if (i > MAXTHREADS) {
+    return -1;
+  }
+
+  return i;
+}
+
 // Look in the process table for an UNUSED proc.
 // If found, initialize state required to run in the kernel,
 // and return with p->lock held.
@@ -125,7 +142,7 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->tid = 0;
-  p->t_cnt = 1;
+  p->t_flag = 1;
 
   p->state = USED;
 
@@ -180,11 +197,15 @@ found:
   p->pagetable = pthread->pagetable;
 
   acquire(&pthread->tlock);
-  p->tid = pthread->t_cnt;
+
+  int tid;
+  if ((tid = alloctid(&pthread->t_flag)) == -1) {
+    release(&pthread->tlock);
+    return 0;
+  }
+  p->tid = tid;
 
   printf("Create thread tid: %d for %d \n", p->tid, pthread->pid);
-  // IsSafe here ?
-  pthread->t_cnt += 1;
   release(&pthread->tlock);
 
   acquire(&pthread->resource_lock);
@@ -219,7 +240,7 @@ found:
 
   // add guard for stack
   uvmclear(p->pagetable, GETTGUARD(p->tid));
-  // #define DEBUGTHREAD
+
 #ifdef DEBUGTHREAD
   vmprint(p->pagetable, 2);
 #endif
@@ -271,7 +292,7 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->tid = 0;
-  p->t_cnt = 1;
+  p->t_flag = 1;
   p->state = UNUSED;
 }
 
@@ -485,6 +506,9 @@ int join(int tid) {
         if(np->state == ZOMBIE && np->tid == tid){
           // Found one.
           pid = np->pid;
+          // clean t_flag
+          p->t_flag -= (1 << tid);
+
           freeproc(np);
           release(&np->lock);
           release(&wait_lock);
@@ -788,6 +812,25 @@ wakeup(void *chan)
         p->state = RUNNABLE;
       }
       release(&p->lock);
+    }
+  }
+}
+
+// Wake up one processes sleeping on chan.
+// Must be called without any p->lock.
+void
+wake1p(void *chan)
+{
+  struct proc *p;
+
+  for(p = proc; p < &proc[NPROC]; p++) {
+    if(p != myproc()){
+      acquire(&p->lock);
+      if(p->state == SLEEPING && p->chan == chan) {
+        p->state = RUNNABLE;
+      }
+      release(&p->lock);
+      break;
     }
   }
 }
