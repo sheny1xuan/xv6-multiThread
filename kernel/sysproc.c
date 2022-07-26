@@ -45,9 +45,9 @@ sys_clone(void)
 uint64
 sys_join(void)
 {
-    uint64 stk;
-    argaddr(0, &stk);
-  return join((void*)stk);
+  int tid;
+  argint(0, &tid);
+  return join(tid);
 }
 
 uint64

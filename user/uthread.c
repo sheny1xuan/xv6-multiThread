@@ -54,7 +54,7 @@ int thread_create(void (*start_routine)(void*), void* args) {
 int thread_join(int tid) {
     for (int i = 0; i < NTHREAD; i++) {
         if (threads[i].used == 1 && threads[i].pid == tid) {
-            int pid = join(&threads[i].userstk);
+            int pid = join(tid);
 
             if (pid > 0) {
                 remove_thread(&pid);

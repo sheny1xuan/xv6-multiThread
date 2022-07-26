@@ -488,9 +488,50 @@ int clone(void (*func)(void*), void* arg, void* stk) {
   return pid;
 }
 
-int join(void* addr) {
+int join(int tid) {
+  struct proc *np;
+  int have_threads, pid;
+  struct proc *p = myproc();
 
-    return -1;
+  acquire(&wait_lock);
+
+  for(;;){
+    // Scan through table looking for exited children.
+    have_threads = 0;
+    for(np = proc; np < &proc[NPROC]; np++){
+      if(np->parent == p && np->tid != 0){
+        // make sure the child isn't still in exit() or swtch().
+        acquire(&np->lock);
+
+        have_threads = 1;
+        if(np->state == ZOMBIE && np->tid == tid){
+          // Found one.
+          pid = np->pid;
+        //   if(addr != 0 && copyout(p->pagetable, addr, (char *)&np->xstate,
+        //                           sizeof(np->xstate)) < 0) {
+        //     release(&np->lock);
+        //     release(&wait_lock);
+        //     return -1;
+        //   }
+          freeproc(np);
+          release(&np->lock);
+          release(&wait_lock);
+          return pid;
+        }
+        release(&np->lock);
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if(!have_threads || p->killed){
+      release(&wait_lock);
+      return -1;
+    }
+    
+    // Wait for a child to exit.
+    sleep(p, &wait_lock);  //DOC: wait-sleep
+  }
+
 }
 
 // Pass p's abandoned children to init.

@@ -21,6 +21,11 @@ void testCreateThread() {
         // thread_join(pid);
     }
 
+    for (int i = 0; i < 4; i++) {
+        int pid = thread_join(i);
+        printf("join thread %d, it's pid is %d\n", i, pid);
+    }
+
     printf("Test create thread pass!\n");
 }
 
