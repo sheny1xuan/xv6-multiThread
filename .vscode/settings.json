@@ -7,6 +7,7 @@
         "atomic": "c",
         "fstream": "c",
         "sstream": "c",
-        "defs.h": "c"
+        "defs.h": "c",
+        "memory_resource": "c"
     }
 }

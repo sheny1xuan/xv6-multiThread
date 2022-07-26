@@ -101,16 +101,19 @@ struct proc {
   // tid != 0: is a child thread of process.
   // 
   // thread_cnt is total thread count of process.
-  uint64 tid;
-  uint64 t_cnt;
 
   // these are private to the process, so p->lock need not be held.
   uint64 kstack;               // Virtual address of kernel stack
+  
+  // protect by corroding lock
+  pagetable_t pagetable;       // User page table
+  struct file *ofile[NOFILE];  // Open files
   uint64 sz;                   // Size of process memory (bytes)
 
   // Share in thread, lock them
-  pagetable_t pagetable;       // User page table
-  struct file *ofile[NOFILE];  // Open files
+  struct spinlock tlock;
+  uint64 tid;
+  uint64 t_cnt;
   
   // thread own
   struct trapframe *trapframe; // data page for trampoline.S

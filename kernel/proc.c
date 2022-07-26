@@ -10,6 +10,10 @@ struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
 
+struct spinlock page_lock[NPROC];
+struct spinlock file_lock[NPROC];
+struct spinlock sz_lock[NPROC];
+
 struct proc *initproc;
 
 int nextpid = 1;
@@ -53,10 +57,17 @@ procinit(void)
   initlock(&wait_lock, "wait_lock");
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
+      initlock(&p->tlock, "thread_lock");
       p->pid = 0;
       p->tid = 0;
       p->t_cnt = 0;
       p->kstack = KSTACK((int) (p - proc));
+  }
+
+  for (int i = 0; i < NPROC; i++) {
+    initlock(&page_lock[i], "pagelock");
+    initlock(&file_lock[i], "filelock");
+    initlock(&sz_lock[i], "szlock");
   }
 }
 
@@ -174,6 +185,18 @@ found:
   p->pid = allocpid();
   p->state = USED;
 
+  // same pagetable for all threads
+  p->pagetable = pthread->pagetable;
+
+  acquire(&pthread->tlock);
+  p->tid = pthread->t_cnt;
+
+  printf("Create thread tid: %d for %d \n", p->tid, pthread->pid);
+  // IsSafe here ?
+  pthread->t_cnt += 1;
+  release(&pthread->tlock);
+
+  acquire(&page_lock[pthread->pid]);
   // Allocate a trapframe page, and map it to process
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
@@ -181,36 +204,48 @@ found:
     return 0;
   }
 
-  // same pagetable
-  p->pagetable = pthread->pagetable;
-
-  p->tid = pthread->t_cnt;
-
-  printf("Create thread tid: %d for %d \n", p->tid, pthread->pid);
-  // IsSafe here ?
-  pthread->t_cnt += 1;
-
   // map thild trapframe.
-  // TODO: data race
   if(mappages(p->pagetable, GETTRAPFRAME(p->tid), PGSIZE,
               (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
     uvmfree(p->pagetable, 0);
     return 0;
   }
 
+  // Allocate a stack page, and map it to process
+  void *stack_page;
+  if((stack_page = kalloc()) == 0){
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
   // map thild stack.
   if(mappages(p->pagetable, GETTSTACK(p->tid), PGSIZE,
-              (uint64)(p->trapframe), PTE_W|PTE_X|PTE_R|PTE_U) < 0){
+              (uint64)(stack_page), PTE_W|PTE_X|PTE_R|PTE_U) < 0){
     uvmfree(p->pagetable, 0);
     return 0;
   }
 
   // add guard for stack
   uvmclear(p->pagetable, GETTGUARD(p->tid));
+  // #define DEBUGTHREAD
+#ifdef DEBUGTHREAD
+  vmprint(p->pagetable, 2);
+#endif
+
+  release(&page_lock[pthread->pid]);
+
+  acquire(&file_lock[pthread->pid]);
+  // increment reference counts on open file descriptors.
+  for(int i = 0; i < NOFILE; i++)
+    if(pthread->ofile[i])
+      p->ofile[i] = pthread->ofile[i];
+  release(&file_lock[pthread->pid]);
 
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
+
   p->context.ra = (uint64)cloneret;
   p->context.sp = p->kstack + PGSIZE;
 
@@ -226,13 +261,24 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
+
+  int page_lock_id;
+
+  if (p->tid == 0) {
+    page_lock_id = p->pid;
+  } else {
+    page_lock_id = p->parent->pid;
+  }
+
   if(p->pagetable) {
+    acquire(&page_lock[page_lock_id]);
     if (p->tid == 0) {
       proc_freepagetable(p->pagetable, p->sz);
     } else {
       uvmunmap(p->pagetable, GETTRAPFRAME(p->tid), 1, 0);
       uvmunmap(p->pagetable, GETTSTACK(p->tid), 1, 0);
     }
+    release(&page_lock[page_lock_id]);
   }
     
   p->pagetable = 0;
@@ -401,7 +447,7 @@ fork(void)
 }
 
 int clone(void (*func)(void*), void* arg, void* stk) {
-  int i, pid;
+  int pid;
   struct proc *np;
   struct proc *p = myproc();
 
@@ -410,10 +456,10 @@ int clone(void (*func)(void*), void* arg, void* stk) {
     return -1;
   }
 
-  np->sz = p->sz;
+  // if sz == -1 use pid's sz
+  np->sz = -1;
 
-  // copy saved user registers.
-  *(np->trapframe) = *(p->trapframe);
+  memset(np->trapframe, 0, PGSIZE);
 
   // memmove((void*)npstk_paddr, (const void*)pstk_paddr, PGSIZE);
   // Cause clone to return 0 in the child.
@@ -423,10 +469,6 @@ int clone(void (*func)(void*), void* arg, void* stk) {
   np->trapframe->a0 = (uint64)arg;
   np->trapframe->ra = (uint64)func;
 
-  // increment reference counts on open file descriptors.
-  for(i = 0; i < NOFILE; i++)
-    if(p->ofile[i])
-      np->ofile[i] = filedup(p->ofile[i]);
   np->cwd = idup(p->cwd);
 
   safestrcpy(np->name, p->name, sizeof(p->name));
