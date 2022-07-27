@@ -384,8 +384,18 @@ growproc(int n)
 {
   uint sz;
   struct proc *p = myproc();
-
-  sz = p->sz;
+  if (p-> tid != 0) {
+    // is a child thread
+    acquire(&p->parent->resource_lock);
+    sz = p->parent->sz;
+  } else {
+    // have child thread
+    if (p->t_flag != 1) {
+      acquire(&p->resource_lock);
+    }
+    sz = p->sz;
+  }
+  
   if(n > 0){
     if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
       return -1;
@@ -393,7 +403,17 @@ growproc(int n)
   } else if(n < 0){
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
-  p->sz = sz;
+
+  if (p->tid != 0) {
+    release(&p->parent->resource_lock);
+    p->parent->sz = sz;
+  } else {
+    p->sz = sz;
+    if (p->t_flag != 1) {
+      release(&p->resource_lock);
+    }
+  }
+  
   return 0;
 }
 
