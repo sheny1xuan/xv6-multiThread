@@ -482,13 +482,14 @@ int clone(void (*func)(void*), void* arg, void* stk) {
 
   memset(np->trapframe, 0, PGSIZE);
 
-  // memmove((void*)npstk_paddr, (const void*)pstk_paddr, PGSIZE);
-  // Cause clone to return 0 in the child.
+  // trapframe is grabage, need add new sp/fp(stack), epc(ins), a0(arg)
   // HEAP TOP
   np->trapframe->sp = GETTSTACK(np->tid) + PGSIZE;
   np->trapframe->s0 = GETTSTACK(np->tid) + PGSIZE;
+  // epc
+  p->trapframe->epc = (uint64)func;
+  // arg
   np->trapframe->a0 = (uint64)arg;
-  np->trapframe->ra = (uint64)func;
 
   np->cwd = idup(p->cwd);
 
@@ -782,7 +783,6 @@ cloneret(void)
 
   // Still holding p->lock from scheduler.
   release(&p->lock);
-  p->trapframe->epc = p->trapframe->ra;
 
   usertrapret();
 }
