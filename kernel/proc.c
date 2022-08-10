@@ -487,7 +487,7 @@ int clone(void (*func)(void*), void* arg, void* stk) {
   np->trapframe->sp = GETTSTACK(np->tid) + PGSIZE;
   np->trapframe->s0 = GETTSTACK(np->tid) + PGSIZE;
   // epc
-  p->trapframe->epc = (uint64)func;
+  np->trapframe->epc = (uint64)func;
   // arg
   np->trapframe->a0 = (uint64)arg;
 
